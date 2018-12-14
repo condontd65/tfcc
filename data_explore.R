@@ -5,7 +5,16 @@ library(stringr)
 library(data.table)
 library(plyr)
 library(stringdist)
-
+library(leaflet)
+library(leaflet.esri)
+library(leaflet.extras)
+library(rjson)
+library(rgdal)
+library(rgeos)
+library(dplyr)
+library(devtools)
+library(webshot)
+library(htmlwidgets)
 
 
 # Set working directory to point to tables interested in
@@ -95,32 +104,6 @@ accept$High.School <- high.matched$match
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ### Plot out school attendance from accepted
 
 
@@ -171,15 +154,15 @@ p.planned.school <- ggplot(data = Planned.School, aes(x=column, y=Freq)) +
 p.planned.school + xlab("Planned College") + ylab('Frequency') + 
   theme(axis.title = element_text(colour = ch.blue)) +
   theme(axis.text = element_text(colour = ch.blue)) +
-  ggtitle('Planned College Attendance') +
+  ggtitle('2018 Planned College Attendance') +
   theme(plot.title = element_text(hjust = 0.5, colour = ch.blue))
 # Print(p.planned.school)
-png("planned_college.png", width = 600,
+png("planned_college_2018.png", width = 600,
     height = 600)
 print(p.planned.school + xlab("Planned College") + ylab('Frequency') + 
         theme(axis.title = element_text(colour = ch.blue)) +
         theme(axis.text = element_text(colour = ch.blue))+
-        ggtitle('Planned College Attendance') +
+        ggtitle('2018 Planned College Attendance') +
         theme(plot.title = element_text(hjust = 0.5, colour = ch.blue)))
 dev.off()
 
@@ -193,16 +176,16 @@ p.zip.code <- ggplot(data = Zip.Code, aes(x=column, y=Freq)) +
 p.zip.code + xlab("Zip Code") + ylab('Frequency') + 
   theme(axis.title = element_text(colour = ch.blue)) +
   theme(axis.text = element_text(colour = ch.blue)) +
-  ggtitle('Current Zip Code Residence') +
+  ggtitle('2018 Current Zip Code Residence') +
   theme(plot.title = element_text(hjust = 0.5, colour = ch.blue))
 
 # Print(p.planned.school)
-png("zip_code.png", width = 900,
+png("zip_code_2018.png", width = 900,
     height = 900)
 print(p.zip.code + xlab("Zip Code") + ylab('Frequency') + 
         theme(axis.title = element_text(colour = ch.blue)) +
         theme(axis.text = element_text(colour = ch.blue)) +
-        ggtitle('Current Zip Code Residence') +
+        ggtitle('2018 Current Zip Code Residence') +
         theme(plot.title = element_text(hjust = 0.5, colour = ch.blue)))
 dev.off()
 
@@ -216,23 +199,131 @@ p.high.school <- ggplot(data = High.School, aes(x=column, y=Freq)) +
 p.high.school + xlab("High School") + ylab('Frequency') + 
   theme(axis.title = element_text(colour = ch.blue)) +
   theme(axis.text = element_text(colour = ch.blue)) +
-  ggtitle('High School Attended') +
+  ggtitle('2018 High School Attended') +
   theme(plot.title = element_text(hjust = 0.5, colour = ch.blue))
 
 # Print(p.planned.school)
-png("high_school.png", width = 1200,
+png("high_school_2018.png", width = 1200,
     height = 900)
 print(p.high.school + xlab("High School") + ylab('Frequency') + 
         theme(axis.title = element_text(colour = ch.blue)) +
         theme(axis.text = element_text(colour = ch.blue,
                                        angle = 90, hjust = 1)) +
-        ggtitle('High School Attended') +
+        ggtitle('2018 High School Attended') +
         theme(plot.title = element_text(hjust = 0.5, colour = ch.blue)))
 dev.off()
 
 
 
 
+
+### Map based on zip codes
+#connect to sql database to bring in zip code spatial data
+vsql22dsn <- c("MSSQL:server=vsql22;database=EGIS;
+               trusted_connection=yes")
+
+# 102686 EPSG
+projstring <- CRS("+proj=lcc +lat_1=41.71666666666667 +lat_2=42.68333333333333 +lat_0=41 +lon_0=-71.5 +x_0=200000 +y_0=750000.0000000001 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 +no_defs")
+
+#ogrListLayers(vsql22dsn)
+lyr <- c("doit.ZIPCODES")
+spdf <- readOGR(dsn = vsql22dsn, layer = lyr)
+
+# Define coordinate system
+proj4string(spdf) <- projstring
+
+zips.4326 <- spTransform(spdf, CRS("+init=epsg:4326"))
+
+# Bring in Boston basemap
+bos <- "https://awsgeo.boston.gov/arcgis/rest/services/Basemaps/BostonCityBasemap_WM/MapServer"
+
+## Join zip code count data to map
+
+# Generate create.color function to create color pallete in greens based off of frequency zips
+create.color <- function(df, col) {
+  df <- within(df, quantile <- as.integer(cut(as.numeric(col),
+                                                    quantile(as.numeric(col),
+                                                             probs = 0:5/5),
+                                                    include.lowest = TRUE)))
+  df %>% mutate(color = case_when(
+    quantile == 1 ~ '#edf8e9',
+    quantile == 2 ~ '#bae4b3',
+    quantile == 3 ~ '#74c476',
+    quantile == 4 ~ '#31a354',
+    quantile == 5 ~ '#006d2c'
+  ))
+}
+
+Zip.Code <- create.color(Zip.Code, Zip.Code$Freq)
+
+#####
+# Merge them
+zips.4326.merge <- merge(zips.4326, Zip.Code, by.x = 'ZIP5', by.y = 'column', all.x = TRUE)
+
+# Separate them to turn NAs into zeros
+zips.step <- data.frame(zips.4326.merge$ZIP5, zips.4326.merge$Freq) %>%
+
+  mutate_all(funs(replace(., is.na(.), 0)))
+names(zips.step) <- c('zip','count')
+
+# Put zeros back into shapefile
+zips.4326.merge$Freq <- zips.step$count
+
+
+##### Experiment with this if you have time
+# Define function to do all this merging
+#merge.rid.na <- function(shape, table, col1, col2) {
+#  df <- merge(shape, table, by.x = col1, by.y = col2, all.x = TRUE)
+#  merge.rdy <- data.frame(col1, df$paste('Freq')) %>%
+#    mutate_all(funs(replace(., is.na(.), 0)))
+#  names(merge.rdy) <- c('zip','count')
+#  merge.rdy$paste('Freq') <- df2$count
+#}
+
+#try the function
+#merge.rid.na(zips.4326, Zip.Code, "ZIP5", "column")
+  
+#####
+
+# Try colors a different way
+#bins <- c(1, 2, 3, 4, 5)
+#pal <- colorBin("Greens", domain = zips.4326.merge$quantile, bins = bins)
+
+# Try colors in a different different way
+pal <- colorNumeric(
+  palette = "Greens",
+  domain = zips.4326.merge$Freq
+)
+
+# Map it
+m <- leaflet() %>%
+  addProviderTiles(providers$Esri.WorldGrayCanvas) %>% 
+  #addMarkers(lng = -71.187886, lat = 42.160247, 
+  #          popup = "Boston City Hall") %>%
+  setView(lng = -71.087886, lat = 42.320247, zoom = 12) %>%
+  #addEsriTiledMapLayer(url = bos) %>%
+  #addEsriDynamicMapLayer(url = dist)
+  addPolygons(data = zips.4326.merge,
+              fillColor = ~pal(zips.4326.merge$Freq),
+              color = "darkgrey3",
+              smoothFactor = 1,
+              fillOpacity = 1,
+              popup = zips.4326.merge$ZIP5,
+              weight = 1.5,
+              highlightOptions = highlightOptions(
+                color = "#FB4D42", weight = 4,
+                bringToFront = TRUE
+              )) %>%
+  addLegend("bottomright", pal = pal, values = zips.4326.merge$Freq,
+            title = "Total Accepted 2018",
+            opacity = 1)
+
+m
+
+# Save the map as png
+saveWidget(m, "temp.html", selfcontained = FALSE)
+webshot("temp.html", file = "zip_2018.png",
+        cliprect = "viewport")
 
 
 
