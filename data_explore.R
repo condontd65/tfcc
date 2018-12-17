@@ -134,6 +134,8 @@ fr.red <- '#FB4D42'
 
 # Test plot using just school counts
 school.counts <- as.data.frame(table(accept$Planned.School))
+school.counts <- subset(school.counts, Freq > 0)
+High.School <- subset(High.School, Freq > 0)
 
 p <- ggplot(data = school.counts, aes(x=Var1, y=Freq)) +
   geom_bar(stat='identity', fill = ch.blue) +
@@ -202,7 +204,7 @@ p.high.school + xlab("High School") + ylab('Frequency') +
   ggtitle('2018 High School Attended') +
   theme(plot.title = element_text(hjust = 0.5, colour = ch.blue))
 
-# Print(p.planned.school)
+# Print(highschool)
 png("high_school_2018.png", width = 1200,
     height = 900)
 print(p.high.school + xlab("High School") + ylab('Frequency') + 
@@ -211,6 +213,31 @@ print(p.high.school + xlab("High School") + ylab('Frequency') +
                                        angle = 90, hjust = 1)) +
         ggtitle('2018 High School Attended') +
         theme(plot.title = element_text(hjust = 0.5, colour = ch.blue)))
+dev.off()
+
+# Try to plot it horizontally and reverse high school name axis
+High.School.rev <- High.School %>% arrange(rev(rownames(.)))
+
+p.high.school.horiz <- ggplot(data = High.School, 
+                              aes(x=factor(column,levels = rev(levels(factor(column)))),y=Freq)) +
+  geom_bar(position = "dodge", stat = "identity", fill = ch.blue) +
+  coord_flip() +
+  geom_text(aes(label=Freq),
+            #position = position_dodge(width = 1),
+            hjust = -0.25, colour = ch.blue, size = 5, vjust = 0.25)
+p.high.school.horiz + xlab("High School") + ylab('Frequency') + 
+  theme(axis.title = element_text(colour = ch.blue)) +
+  theme(axis.text = element_text(colour = ch.blue)) +
+  ggtitle('2018 High School Attended') +
+  theme(plot.title = element_text(hjust = 0.5, colour = ch.blue))
+# print high school horizontal
+png("high_school_horiz_2018.png", width = 900,
+    height = 1200)
+p.high.school.horiz + xlab("High School") + ylab('Frequency') + 
+  theme(axis.title = element_text(colour = ch.blue, size = 16)) +
+  theme(axis.text = element_text(colour = ch.blue, size = 16)) +
+  ggtitle('2018 High School Attended') +
+  theme(plot.title = element_text(hjust = 0.5, colour = ch.blue, size = 22))
 dev.off()
 
 
