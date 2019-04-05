@@ -5,7 +5,6 @@
 library(ggplot2)
 library(RODBC)
 library(stringr)
-#library(sqldf)
 library(data.table)
 library(plyr)
 library(stringdist)
@@ -54,12 +53,11 @@ zip <- sqlQuery(con, query)
 rm(query)
 odbcCloseAll()
 
-# Fix zip codes in zip by adding a 0 at the end
+# Fix zip codes in zip by adding a 0 at the beginning
 zip$zip <- str_pad(zip$zip, 5, pad = "0")
 
-# Fix zip codes in master as there are values that don't begin with 0
-# use loop over all zips
-# create vector of column names to loop over
+## Fix zip codes in data frames as there are values that don't begin with 0
+# Start by cleaning up zip miscellaneously 
 accepted.2018$Zip <- accepted.2018$Current.Zip.Code
 accepted.2016$Zip <- accepted.2016$Current.Zip.Code
 accepted.2016[1:100,18] <- accepted.2016[1:100,9]
@@ -67,31 +65,15 @@ accepted.2017$Zip <- as.integer(as.character(accepted.2017$Zip))
 accepted.2018$Zip <- as.integer(as.character(accepted.2018$Zip))
 
 
-## Turn this into a loop if you have time
-
-#dfs <- list(accepted.2018,accepted.2016,
- #            accepted.2017,accepted.spring.2018)
-#new.names <- c('accept.2018', 'accept.2016', 'accept.2017', 'accept.sp.2018')
-#dfs <- lapply(dfs, setNames, nm = new.names)
-
-#for (df in dfs) {
- # test.zip <- nchar(as.character(paste(df),"$Zip", sep = ""))
-  #test.bool <- test.zip == 4
-  #paste(df,"$zip.bool", sep = "") <- test.bool
-  #rm(test.bool)
-  #rm(test.zip)
-  #paste(df,"$Zip[",df,"$zip.bool", sep = "") <- str_pad(paste(df,"$Zip"), 5, pad = "0")
-  
-#}
-## Turn this into a loop if you have time
-
 # Fix zip for accepted.2016
 
+# NAs give a problem, so write a function to convert all to zeros
 na.zero <- function(x) {
   x[is.na(x)] <- 0
   return(x)
 }
 
+# Write function to pad values with only 4 zip characters with a zero at the front
 zip.fix <- function(df) {
   master <- df
   master$Zip <- na.zero(master$Zip)
@@ -104,48 +86,112 @@ zip.fix <- function(df) {
   df <- master
 }
 
+# Run zip.fix on data frames. Gives an error but can be ignored
 accepted.2016 <- zip.fix(accepted.2016)
 accepted.2017 <- zip.fix(accepted.2017)
 accepted.2018 <- zip.fix(accepted.2018)
 accepted.spring.2018 <- zip.fix(accepted.spring.2018)
 
 
-dfs <- lapply(dfs, zip.fix)
+### Take a look at high schools attended (clean it up)
+# Replace CASH and EMK, two cases that are difficult with the other replacement
+accepted.2016$High.School.Attended <- gsub('EMK', 'Edward M Kennedy High School',
+                                           accepted.2016$High.School.Attended)
+accepted.2016$High.School.Attended <- gsub('Cash', 'Community Academy of Science and Health',
+                                           accepted.2016$High.School.Attended)
+accepted.2016$High.School.Attended <- gsub('CASH', 'Community Academy of Science and Health',
+                                           accepted.2016$High.School.Attended)
+accepted.2016$High.School.Attended <- gsub('BATA', 'Boston Adult Technical Academy',
+                                           accepted.2016$High.School.Attended)
+accepted.2016$High.School.Attended <- gsub('CRLS', 'Cambridge Ringe and Latin School',
+                                           accepted.2016$High.School.Attended)
+# Alter naming of column to match others
+accepted.2017$High.School.Attended <- accepted.2017$Boston.Public.High.School.Attended
 
-list2env(x = dfs, envir = .GlobalEnv)
-
-
-
-
-#for (df in dfs) {
-#  master <- df
-#  master$Zip <- master$Zip %>%
-#    mutate(Zip = if_else(is.na(Zip), 0, Zip))
-#  test.zip <- nchar(as.character(master$Zip))
-#  test.bool <- test.zip == 4
-#  master$zip.bool <- test.bool
-#  rm(test.bool)
-#  rm(test.zip)
-#  master$Zip[master$zip.bool] <- str_pad(master$Zip, width = 5, pad = "0")
-#  df <- master
-#}
-
-
-
-
-master <- accepted.2016
-#master$Current.Zip.Code[is.na(master$Current.Zip.Code)] <- 00000
-test.zip <- nchar(as.character(master$Zip))
-test.bool <- test.zip == 4
-
-master$zip.bool <- test.bool
-rm(test.bool)
-rm(test.zip)
-master$Zip[master$zip.bool] <- str_pad(master$Zip, width = 5, pad = "0")
-accepted.2016 <- master
+accepted.2017$High.School.Attended <- gsub('EMK', 'Edward M Kennedy High School',
+                                           accepted.2017$High.School.Attended)
+accepted.2017$High.School.Attended <- gsub('CASH', 'Community Academy of Science and Health',
+                                           accepted.2017$High.School.Attended)
+accepted.2017$High.School.Attended <- gsub('Cash', 'Community Academy of Science and Health',
+                                           accepted.2017$High.School.Attended)
+accepted.2017$High.School.Attended <- gsub('BATA', 'Boston Adult Technical Academy',
+                                           accepted.2017$High.School.Attended)
+accepted.2017$High.School.Attended <- gsub('CRLS', 'Cambridge Ringe and Latin School',
+                                           accepted.2017$High.School.Attended)
 
 
+accepted.2018$High.School.Attended <- gsub('EMK', 'Edward M Kennedy High School',
+                                           accepted.2018$High.School.Attended)
+accepted.2018$High.School.Attended <- gsub('CASH', 'Community Academy of Science and Health',
+                                           accepted.2018$High.School.Attended)
+accepted.2018$High.School.Attended <- gsub('Cash', 'Community Academy of Science and Health',
+                                           accepted.2018$High.School.Attended)
+accepted.2018$High.School.Attended <- gsub('BATA', 'Boston Adult Technical Academy',
+                                           accepted.2018$High.School.Attended)
+accepted.2018$High.School.Attended <- gsub('CRLS', 'Cambridge Ringe and Latin School',
+                                           accepted.2018$High.School.Attended)
 
+# Alter naming of column to match others
+accepted.spring.2018$High.School.Attended <- accepted.spring.2018$Boston.Public.High.School.Attended
+accepted.spring.2018$High.School.Attended <- gsub('EMK', 'Edward M Kennedy High School',
+                                           accepted.spring.2018$High.School.Attended)
+accepted.spring.2018$High.School.Attended <- gsub('CASH', 'Community Academy of Science and Health',
+                                           accepted.spring.2018$High.School.Attended)
+accepted.spring.2018$High.School.Attended <- gsub('Cash', 'Community Academy of Science and Health',
+                                                  accepted.spring.2018$High.School.Attended)
+accepted.spring.2018$High.School.Attended <- gsub('BATA', 'Boston Adult Technical Academy',
+                                                  accepted.spring.2018$High.School.Attended)
+accepted.spring.2018$High.School.Attended <- gsub('CRLS', 'Cambridge Ringe and Latin School',
+                                                  accepted.spring.2018$High.School.Attended)
+
+## Use string distance matching to find closes matches to known schools list
+# Write function to do this
+high.match <- function(df, df2) {
+  d <- df
+  hs <- df2
+  i <- amatch(d$High.School.Attended, hs$high.schools, maxDist = 40)
+  high.match <- data.frame(rawtext = d$High.School.Attended,
+                           match = hs$high.schools[i])
+  d$High.School <- high.match$match
+  df <- d
+}
+
+# Run high.match function on the 4 data frames
+accepted.2016 <- high.match(accepted.2016, high.schools)
+accepted.2017 <- high.match(accepted.2017, high.schools)
+accepted.2018 <- high.match(accepted.2018, high.schools)
+accepted.spring.2018 <- high.match(accepted.spring.2018, high.schools)
+
+# Turn "blank" into NA
+accepted.2016$High.School[accepted.2016$High.School == "blank"] <- NA
+accepted.2017$High.School[accepted.2017$High.School == "blank"] <- NA
+accepted.2018$High.School[accepted.2018$High.School == "blank"] <- NA
+accepted.spring.2018$High.School[accepted.spring.2018$High.School == "blank"] <- NA
+
+# Remove unneeded high schol table going forward
+rm(high.schools)
+
+accepted.2016$Planned.College <- accepted.2016$Which.school.do.you.plan.to.attend.in.Spring.2017.
+accepted.2017$Planned.College <- accepted.2017$Which.school.do.you.plan.to.attend.in.Spring.2017.
+accepted.2018$Planned.College <- accepted.2018$Which.school.do.you.plan.to.attend.in.Fall.2017.
+accepted.spring.2018$Planned.College <- accepted.spring.2018$Which.school.do.you.plan.to.attend.in.Spring.2017.
+
+# Bunker Hill Community college is misspelled in the 2018 data frame
+accepted.2018$Planned.College <- as.character(accepted.2018$Planned.College)
+accepted.2018$Planned.College[accepted.2018$Planned.College == "Bunker Hill Commuity College"] <- 
+  "Bunker Hill Community College (BHCC)"
+
+# Set 0 and 00000 values in Zip to NA
+accepted.2016$Zip[accepted.2016$Zip == "0" | accepted.2016$Zip == "00000"] <- NA
+accepted.2017$Zip[accepted.2017$Zip == "0" | accepted.2017$Zip == "00000"] <- NA
+accepted.2018$Zip[accepted.2018$Zip == "0" | accepted.2018$Zip == "00000"] <- NA
+accepted.spring.2018$Zip[accepted.spring.2018$Zip == "0" | accepted.spring.2018$Zip == "00000"] <- NA
+
+### Write files to csv to be used in other scripts moving forward
+#write.csv(accepted.2016, file = "clean_files/accepted_2016.csv")
+#write.csv(accepted.2017, file = "clean_files/accepted_2017.csv")
+#write.csv(accepted.2018, file = "clean_files/accepted_2018.csv")
+#write.csv(accepted.spring.2018, file = "clean_files/accepted_spring_2018.csv")
 
 
 

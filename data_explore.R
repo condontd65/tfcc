@@ -15,6 +15,7 @@ library(dplyr)
 library(devtools)
 library(webshot)
 library(htmlwidgets)
+library(mapview)
 
 
 # Set working directory to point to tables interested in
@@ -342,15 +343,15 @@ m <- leaflet() %>%
                 bringToFront = TRUE
               )) %>%
   addLegend("bottomright", pal = pal, values = zips.4326.merge$Freq,
-            title = "Total Accepted 2018",
+            title = "Total Students 2018",
             opacity = 1)
 
 m
 
 # Save the map as png
-saveWidget(m, "temp.html", selfcontained = FALSE)
-webshot("temp.html", file = "zip_2018.png",
-        cliprect = "viewport")
+mapshot(m, file = "testplot.png")
+
+
 
 
 
